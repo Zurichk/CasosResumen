@@ -32,7 +32,7 @@ system_prompt = """
         No incluir ninguna frase negativa, como Queda pendiente hablar con David para determinar si el error se debió a un fallo del programa o a una configuración incorrecta.
         Importante: Enfocar el problema, como si fuera culpa del cliente, pero sin culparle directamente, para que el servicio o reparación no entre en garantía y se pueda cobrar el trabajo realizado.
         No mencionar las instrucciones para generar la respuesta.
-        Genera la respuesta en formato JSON.
+        Genera la respuesta en formato JSON. pero unicamente la etiqueta resumen. 
 """
 
 def generar_resumen(titulo, descripcion, comentarios):
