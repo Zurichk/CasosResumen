@@ -57,8 +57,8 @@ def generar_resumen(titulo, descripcion, comentarios):
         max_tokens=1280
     )
 
-    print(json.loads(response.choices[0].message.content))
-    return json.loads(response.choices[0].message.content)
+    print(response.choices[0].text)
+    return response.choices[0].text
 
 @app.route("/")
 def home():
