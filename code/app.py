@@ -21,7 +21,8 @@ def get_api_key():
 API_KEY = get_api_key()
 
 # Usar DeepSeek
-deepseek_api_url = 'https://api.deepseek.com/'
+# deepseek_api_url = 'https://api.deepseek.com/'
+deepseek_api_url = 'https://api.deepseek.com/beta'
 client = OpenAI(api_key=API_KEY, base_url=deepseek_api_url)
 
 system_prompt = """
@@ -41,12 +42,19 @@ def generar_resumen(titulo, descripcion, comentarios):
     messages = [{"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}]
 
-    response = client.chat.completions.create(
+    # response = client.chat.completions.create(
+    #     model="deepseek-coder",
+    #     messages=messages,
+    #     response_format={
+    #         'type': 'json_object'
+    #     }
+    # )
+
+    response = client.completions.create(
         model="deepseek-coder",
-        messages=messages,
-        response_format={
-            'type': 'text',
-        }
+        prompt=system_prompt,
+        suffix=user_prompt,
+        max_tokens=1280
     )
 
     print(json.loads(response.choices[0].message.content))
