@@ -45,7 +45,7 @@ def generar_resumen(titulo, descripcion, comentarios):
         model="deepseek-coder",
         messages=messages,
         response_format={
-            'type': 'json_object'
+            'type': 'plain_text',
         }
     )
 
