@@ -1,8 +1,10 @@
 import json
 from flask import Flask, request, jsonify, render_template, abort
 import os
-from openai import OpenAI
 import configparser
+# --- NUEVO: Importar clientes de OpenAI y Gemini ---
+import google.generativeai as genai
+from openai import OpenAI
 
 # Definir la ruta donde se guardarán los archivos cargados
 if os.environ.get('DOCKER', '') == "yes":
@@ -10,20 +12,41 @@ if os.environ.get('DOCKER', '') == "yes":
 else:
     UPLOAD_FOLDER = 'subidas'
 
-app = Flask(__name__, static_url_path='/static')
+app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-def get_api_key():
+# --- NUEVO: Función para obtener API key según modelo ---
+def get_api_key(tipo="deepseek"):
     config = configparser.ConfigParser()
-    config.read('config.ini')
-    return config['deepseek']['apikey']
+    config.read(os.path.join('docs', 'config.ini'))
+    secrets_path = os.path.join('docs', 'secrets.ini')
+    if os.path.exists(secrets_path):
+        secrets = configparser.ConfigParser()
+        secrets.read(secrets_path)
+        if tipo == "gemini":
+            if 'secrets' in secrets:
+                if 'gemini_apikey' in secrets['secrets'] and secrets['secrets']['gemini_apikey']:
+                    return secrets['secrets']['gemini_apikey']
+                if 'apikeygemini' in secrets['secrets'] and secrets['secrets']['apikeygemini']:
+                    return secrets['secrets']['apikeygemini']
+        if tipo == "deepseek" and 'secrets' in secrets and 'apikeydeepseek' in secrets['secrets'] and secrets['secrets']['apikeydeepseek']:
+            return secrets['secrets']['apikeydeepseek']
+        if tipo == "openai" and 'secrets' in secrets and 'apikeyopenai' in secrets['secrets'] and secrets['secrets']['apikeyopenai']:
+            return secrets['secrets']['apikeyopenai']
+    # Fallback a config.ini
+    if tipo == "gemini" and 'gemini' in config and 'apikey' in config['gemini']:
+        return config['gemini']['apikey']
+    if tipo == "deepseek" and 'deepseek' in config and 'apikey' in config['deepseek']:
+        return config['deepseek']['apikey']
+    if tipo == "openai" and 'openai' in config and 'apikey' in config['openai']:
+        return config['openai']['apikey']
+    raise RuntimeError(f'No se encontró la clave API para {tipo} en secrets.ini ni en config.ini')
 
-API_KEY = get_api_key()
-
-# Usar DeepSeek
-# deepseek_api_url = 'https://api.deepseek.com/'
-deepseek_api_url = 'https://api.deepseek.com/beta'
-client = OpenAI(api_key=API_KEY, base_url=deepseek_api_url)
+# --- NUEVO: Inicialización de modelos ---
+genai.configure(api_key=get_api_key("gemini"))
+model_gemini = genai.GenerativeModel("gemini-2.0-flash")
+openai_client = OpenAI(api_key=get_api_key("openai"))
+deepseek_client = OpenAI(api_key=get_api_key("deepseek"), base_url="https://api.deepseek.com")
 
 system_prompt = """
   Instrucciones a seguir para generar la respuesta:
@@ -36,29 +59,44 @@ system_prompt = """
         Genera la respuesta en texto plano, sin formato, y sin incluir la pregunta.
 """
 
-def generar_resumen(titulo, descripcion, comentarios):
+# --- NUEVO: Función para elegir modelo y generar resumen ---
+def generar_resumen(titulo, descripcion, comentarios, modelo):
     user_prompt = f"{titulo}. {descripcion}. {comentarios}"
-
-    messages = [{"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}]
-
-    # response = client.chat.completions.create(
-    #     model="deepseek-coder",
-    #     messages=messages,
-    #     response_format={
-    #         'type': 'json_object'
-    #     }
-    # )
-
-    response = client.completions.create(
-        model="deepseek-coder",
-        prompt=system_prompt,
-        suffix=user_prompt,
-        max_tokens=1280
-    )
-
-    print(response.choices[0].text)
-    return response.choices[0].text
+    prompt = system_prompt + "\n" + user_prompt
+    if modelo == "gemini":
+        response = model_gemini.generate_content(prompt)
+        return response.text
+    elif modelo == "openai":
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+        )
+        return response.choices[0].message.content
+    elif modelo == "deepseek":
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        # response = deepseek_client.chat.completions.create(
+        #     model="deepseek-chat",
+        #     messages=messages,
+        #     response_format={'type': 'text'},
+        #     timeout=60,
+        #     temperature=0.1, 
+        #     max_tokens=4000
+        # )
+        
+        response = deepseek_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=messages,
+            timeout=60,
+            temperature=0.1, 
+            max_tokens=4000
+        )
+        return response.choices[0].message.content
+    else:
+        return "Modelo no soportado."
 
 @app.route("/")
 def home():
@@ -69,9 +107,9 @@ def resumir():
     titulo = request.form['titulo']
     descripcion = request.form['descripcion']
     comentarios = request.form['comentarios']
-
+    modelo = request.form.get('modelo', 'gemini')  # Por defecto, usar gemini
     try:
-        resumen = generar_resumen(titulo, descripcion, comentarios)
+        resumen = generar_resumen(titulo, descripcion, comentarios, modelo)
         return render_template('resumen.html', resumen=resumen)
     except Exception as e:
         error_message = f"Error al generar el resumen: {str(e)}"
@@ -94,7 +132,7 @@ def enviar_datos_bc():
 
     # Realizar el resumen
     try:
-        resumen = generar_resumen(datos[0]['Titulo'], datos[0]['Descripcion'], datos[0]['Comentarios'])
+        resumen = generar_resumen(datos[0]['Titulo'], datos[0]['Descripcion'], datos[0]['Comentarios'], "gemini")
         return jsonify({'resumen': resumen})
     except Exception as e:
         print(str(e))

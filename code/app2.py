@@ -1,10 +1,19 @@
 import json
 from openai import OpenAI
 import configparser
+import os
 
 def get_api_key():
     config = configparser.ConfigParser()
-    config.read('config.ini')
+    config.read(os.path.join('code', 'docs', 'config.ini'))
+    # Intenta primero en secrets.ini si existe
+    secrets_path = os.path.join('code', 'docs', 'secrets.ini')
+    if os.path.exists(secrets_path):
+        secrets = configparser.ConfigParser()
+        secrets.read(secrets_path)
+        if 'secrets' in secrets and 'apikey' in secrets['secrets'] and secrets['secrets']['apikey']:
+            return secrets['secrets']['apikey']
+    # Fallback a config.ini
     return config['deepseek']['apikey']
 
 API_KEY = get_api_key()

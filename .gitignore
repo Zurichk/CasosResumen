@@ -1,0 +1,22 @@
+# Ignorar entorno virtual de Python
+Lib/
+Scripts/
+pyvenv.cfg
+# Otros archivos y carpetas comunes
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+ENV/
+.envrc
+
+# VSCode
+.vscode/
+
+# Configuración y secretos
+*docs
+code/docs/config.ini
+code/docs/secrets.ini
