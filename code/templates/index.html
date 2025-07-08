@@ -106,6 +106,42 @@
             </div>
         </form>
     </div>
+    <div class="container mt-4">
+        <div class="alert alert-info">
+            <h5><i class="bi bi-info-circle"></i> ¿Cómo consumir la API REST?</h5>
+            <p>Puedes enviar peticiones POST a <code>/enviar_datos_bc</code> con el siguiente formato JSON:</p>
+            <pre style="background:#f8f9fa;border-radius:8px;padding:10px;">
+[
+  {
+    "Titulo": "Título del caso",
+    "Descripcion": "Descripción detallada",
+    "Comentarios": "Comentarios adicionales",
+    "modelo": "gemini"  // Opcional: 'gemini', 'openai' o 'deepseek'. Si no se envía, se usa 'gemini' por defecto.
+  }
+]
+            </pre>
+            <p>Ejemplo en Python:</p>
+            <pre style="background:#f8f9fa;border-radius:8px;padding:10px;">
+import requests
+import json
+
+data = [{
+    "Titulo": "Ejemplo de título",
+    "Descripcion": "Texto de la descripción",
+    "Comentarios": "Texto de comentarios",
+    "modelo": "openai"  # Omitir para usar gemini
+}]
+
+response = requests.post(
+    "http://localhost:5000/enviar_datos_bc",
+    headers={"Content-Type": "application/json"},
+    data=json.dumps(data)
+)
+print(response.json())
+            </pre>
+            <p>El campo <code>modelo</code> es opcional. Si no se especifica, se usará Gemini por defecto.</p>
+        </div>
+    </div>
 </body>
 
 </html>

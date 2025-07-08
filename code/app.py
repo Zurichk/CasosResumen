@@ -17,6 +17,17 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # --- NUEVO: Función para obtener API key según modelo ---
 def get_api_key(tipo="deepseek"):
+    # 1. Buscar primero en variables de entorno (para despliegue cloud seguro)
+    env_map = {
+        "gemini": ["APIKEYGEMINI", "GEMINI_APIKEY", "GEMINI_KEY"],
+        "deepseek": ["APIKEYDEEPSEEK", "DEEPSEEK_APIKEY", "DEEPSEEK_KEY"],
+        "openai": ["APIKEYOPENAI", "OPENAI_APIKEY", "OPENAI_KEY"]
+    }
+    for env_var in env_map.get(tipo, []):
+        valor = os.environ.get(env_var)
+        if valor:
+            return valor
+    # 2. Buscar en secrets.ini (local/dev)
     config = configparser.ConfigParser()
     config.read(os.path.join('docs', 'config.ini'))
     secrets_path = os.path.join('docs', 'secrets.ini')
@@ -33,14 +44,14 @@ def get_api_key(tipo="deepseek"):
             return secrets['secrets']['apikeydeepseek']
         if tipo == "openai" and 'secrets' in secrets and 'apikeyopenai' in secrets['secrets'] and secrets['secrets']['apikeyopenai']:
             return secrets['secrets']['apikeyopenai']
-    # Fallback a config.ini
+    # 3. Fallback a config.ini (legacy)
     if tipo == "gemini" and 'gemini' in config and 'apikey' in config['gemini']:
         return config['gemini']['apikey']
     if tipo == "deepseek" and 'deepseek' in config and 'apikey' in config['deepseek']:
         return config['deepseek']['apikey']
     if tipo == "openai" and 'openai' in config and 'apikey' in config['openai']:
         return config['openai']['apikey']
-    raise RuntimeError(f'No se encontró la clave API para {tipo} en secrets.ini ni en config.ini')
+    raise RuntimeError(f'No se encontró la clave API para {tipo} en variables de entorno, secrets.ini ni config.ini')
 
 # --- NUEVO: Inicialización de modelos ---
 genai.configure(api_key=get_api_key("gemini"))
@@ -107,7 +118,7 @@ def resumir():
     titulo = request.form['titulo']
     descripcion = request.form['descripcion']
     comentarios = request.form['comentarios']
-    modelo = request.form.get('modelo', 'gemini')  # Por defecto, usar gemini
+    modelo = request.form.get('modelo') or 'gemini'  # Por defecto, usar gemini si no se selecciona
     try:
         resumen = generar_resumen(titulo, descripcion, comentarios, modelo)
         return render_template('resumen.html', resumen=resumen)
@@ -130,9 +141,10 @@ def enviar_datos_bc():
         print({'error': 'Los datos deben ser una lista.'})
         return jsonify({'error': 'Los datos deben ser una lista.'}), 400
 
-    # Realizar el resumen
+    # Obtener modelo del JSON (opcional, por defecto gemini)
+    modelo = datos[0].get('modelo', 'gemini') if isinstance(datos[0], dict) else 'gemini'
     try:
-        resumen = generar_resumen(datos[0]['Titulo'], datos[0]['Descripcion'], datos[0]['Comentarios'], "gemini")
+        resumen = generar_resumen(datos[0]['Titulo'], datos[0]['Descripcion'], datos[0]['Comentarios'], modelo)
         return jsonify({'resumen': resumen})
     except Exception as e:
         print(str(e))
